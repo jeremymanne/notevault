@@ -4,9 +4,7 @@ const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
 
 if (!globalForPrisma.prisma) {
   globalForPrisma.prisma = new PrismaClient({
-    datasource: {
-      url: process.env.DATABASE_URL,
-    },
+    datasourceUrl: process.env.DATABASE_URL,
   })
 }
 
