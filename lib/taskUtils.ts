@@ -275,6 +275,25 @@ export function addHeadingToContent(content: string, text: string, level = 2): s
 }
 
 /**
+ * Delete a specific task item from a taskList and return the updated JSON string.
+ */
+export function deleteTaskFromContent(
+  content: string,
+  taskListIndex: number,
+  taskItemIndex: number
+): string {
+  const doc = parseDoc(content)
+  if (!doc) return content
+
+  const taskList = doc.content[taskListIndex]
+  if (!taskList?.content) return content
+
+  taskList.content = taskList.content.filter((_, i) => i !== taskItemIndex)
+
+  return JSON.stringify(doc)
+}
+
+/**
  * Parse the noteId out of a task drag ID (`noteId__taskListIndex__taskItemIndex`).
  */
 export function noteIdFromTaskId(taskId: string): string {

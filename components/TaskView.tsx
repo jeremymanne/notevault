@@ -16,7 +16,7 @@ import {
   extractTasksFromContent, extractItemsFromContent,
   toggleTaskInContent, reorderTasksInContent,
   copyTaskToContent, noteIdFromTaskId,
-  addTaskToContent,
+  addTaskToContent, deleteTaskFromContent,
 } from '@/lib/taskUtils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -55,9 +55,9 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
 // ─── Sortable task row ────────────────────────────────────────────────────────
 
 function SortableTaskRow({
-  task, onToggle, onGoToNote,
+  task, onToggle, onDelete, onGoToNote,
 }: {
-  task: ExtractedTask; onToggle: (t: ExtractedTask) => void; onGoToNote: (id: string) => void
+  task: ExtractedTask; onToggle: (t: ExtractedTask) => void; onDelete: (t: ExtractedTask) => void; onGoToNote: (id: string) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id })
@@ -85,6 +85,13 @@ function SortableTaskRow({
         className="flex-shrink-0 text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-400 dark:hover:text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
       >
         Go to note →
+      </button>
+      <button
+        onClick={() => onDelete(task)}
+        className="flex-shrink-0 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-sm leading-none"
+        aria-label="Delete task"
+      >
+        ×
       </button>
     </div>
   )
@@ -147,11 +154,12 @@ function AddItemForm({
 // ─── Note group ───────────────────────────────────────────────────────────────
 
 function NoteGroup({
-  group, filter, onTaskToggle, onGoToNote, onAddItem, onCreateNote, isNew, onNewGroupSettled,
+  group, filter, onTaskToggle, onTaskDelete, onGoToNote, onAddItem, onCreateNote, isNew, onNewGroupSettled,
 }: {
   group: NoteGroup
   filter: Filter
   onTaskToggle: (t: ExtractedTask) => void
+  onTaskDelete: (t: ExtractedTask) => void
   onGoToNote: (id: string) => void
   onAddItem: (noteId: string, text: string) => void
   onCreateNote: () => void
@@ -194,14 +202,14 @@ function NoteGroup({
             item.type === 'heading' ? (
               <HeadingRow key={item.id} item={item} />
             ) : (
-              <SortableTaskRow key={item.id} task={item} onToggle={onTaskToggle} onGoToNote={onGoToNote} />
+              <SortableTaskRow key={item.id} task={item} onToggle={onTaskToggle} onDelete={onTaskDelete} onGoToNote={onGoToNote} />
             )
           )}
         </SortableContext>
       ) : (
         <SortableContext items={visibleTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {visibleTasks.map((task) => (
-            <SortableTaskRow key={task.id} task={task} onToggle={onTaskToggle} onGoToNote={onGoToNote} />
+            <SortableTaskRow key={task.id} task={task} onToggle={onTaskToggle} onDelete={onTaskDelete} onGoToNote={onGoToNote} />
           ))}
         </SortableContext>
       )}
@@ -405,6 +413,14 @@ export default function TaskView({ onNavigate }: TaskViewProps) {
     await saveNoteContent(task.noteId, newContent)
   }
 
+  async function handleDeleteTask(task: ExtractedTask) {
+    const group = groups.find((g) => g.noteId === task.noteId)
+    if (!group) return
+    const newContent = deleteTaskFromContent(group.content, task.taskListIndex, task.taskItemIndex)
+    updateGroupContent(task.noteId, newContent)
+    await saveNoteContent(task.noteId, newContent)
+  }
+
   async function handleAddItem(noteId: string, text: string) {
     const group = groups.find((g) => g.noteId === noteId)
     if (!group) return
@@ -561,6 +577,7 @@ export default function TaskView({ onNavigate }: TaskViewProps) {
                     group={group}
                     filter={filter}
                     onTaskToggle={handleToggle}
+                    onTaskDelete={handleDeleteTask}
                     onGoToNote={goToNote}
                     onAddItem={handleAddItem}
                     onCreateNote={() => setShowNewGroup(true)}

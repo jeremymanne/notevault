@@ -89,6 +89,11 @@ function SortableNoteCard({
 
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex flex-wrap gap-1">
+            {note.notebook && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300">
+                {note.notebook.name}
+              </span>
+            )}
             {note.tags.slice(0, 3).map((nt) => (
               <span
                 key={nt.tagId}
