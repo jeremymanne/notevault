@@ -6,7 +6,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import type { Note, Notebook } from '@/lib/types'
+import type { Note, Notebook, Tag } from '@/lib/types'
 import { tagColorClass } from '@/lib/utils'
 
 interface EditorProps {
@@ -43,40 +43,112 @@ function ToolbarDivider() {
   return <span className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1 flex-shrink-0" />
 }
 
-// ─── Tag input ────────────────────────────────────────────────────────────────
+// ─── Tag selector ─────────────────────────────────────────────────────────────
 
-function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
-  const [input, setInput] = useState('')
+function TagSelector({ tagNames, onChange }: { tagNames: string[]; onChange: (tags: string[]) => void }) {
+  const [allTags, setAllTags] = useState<Tag[]>([])
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [showNewInput, setShowNewInput] = useState(false)
+  const [newTagName, setNewTagName] = useState('')
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
-  function addTag() {
-    const trimmed = input.trim().toLowerCase()
-    if (!trimmed || tags.includes(trimmed)) { setInput(''); return }
-    onChange([...tags, trimmed])
-    setInput('')
+  useEffect(() => {
+    if (!showDropdown) return
+    fetch('/api/tags').then((r) => r.ok ? r.json() : []).then(setAllTags)
+  }, [showDropdown])
+
+  useEffect(() => {
+    if (!showDropdown) return
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false)
+        setShowNewInput(false)
+        setNewTagName('')
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showDropdown])
+
+  function toggleTag(name: string) {
+    onChange(tagNames.includes(name) ? tagNames.filter((t) => t !== name) : [...tagNames, name])
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag() }
-    else if (e.key === 'Backspace' && !input) onChange(tags.slice(0, -1))
+  async function handleCreateTag() {
+    const trimmed = newTagName.trim().toLowerCase()
+    if (!trimmed) return
+    const res = await fetch('/api/tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: trimmed }),
+    })
+    if (res.ok) {
+      const tag: Tag = await res.json()
+      setAllTags((prev) => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)))
+      if (!tagNames.includes(trimmed)) onChange([...tagNames, trimmed])
+      setNewTagName('')
+      setShowNewInput(false)
+    }
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {tags.map((tag) => (
-        <span key={tag} className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${tagColorClass(tag)}`}>
-          {tag}
-          <button onClick={() => onChange(tags.filter((t) => t !== tag))} className="opacity-60 hover:opacity-100 leading-none">×</button>
-        </span>
-      ))}
-      <input
-        type="text"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={addTag}
-        placeholder={tags.length === 0 ? 'Add tags…' : ''}
-        className="bg-transparent text-xs text-gray-500 dark:text-gray-400 outline-none placeholder-gray-300 dark:placeholder-gray-600 min-w-16 max-w-32"
-      />
+    <div className="relative" ref={dropdownRef}>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {tagNames.map((tag) => (
+          <span key={tag} className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${tagColorClass(tag)}`}>
+            {tag}
+            <button onClick={() => toggleTag(tag)} className="opacity-60 hover:opacity-100 leading-none">×</button>
+          </span>
+        ))}
+        <button
+          onMouseDown={(e) => { e.preventDefault(); setShowDropdown((s) => !s) }}
+          className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+        >
+          {tagNames.length === 0 ? 'Add tags…' : '+ tag'}
+        </button>
+      </div>
+
+      {showDropdown && (
+        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 min-w-44 py-1">
+          {allTags.length === 0 && !showNewInput && (
+            <p className="px-3 py-1.5 text-xs text-gray-400 dark:text-gray-500">No tags yet — create one below</p>
+          )}
+          {allTags.map((tag) => (
+            <button
+              key={tag.id}
+              onMouseDown={(e) => { e.preventDefault(); toggleTag(tag.name) }}
+              className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+            >
+              <span className={`w-3.5 h-3.5 flex items-center justify-center text-indigo-500 flex-shrink-0 ${tagNames.includes(tag.name) ? 'opacity-100' : 'opacity-0'}`}>✓</span>
+              <span className={`px-1.5 py-0.5 rounded-full font-medium ${tagColorClass(tag.name)}`}>{tag.name}</span>
+            </button>
+          ))}
+          <div className="border-t border-gray-100 dark:border-gray-700 mt-1 pt-1">
+            {showNewInput ? (
+              <div className="px-2 pb-1">
+                <input
+                  autoFocus
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); handleCreateTag() }
+                    if (e.key === 'Escape') { setShowNewInput(false); setNewTagName('') }
+                  }}
+                  placeholder="Tag name…"
+                  className="w-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            ) : (
+              <button
+                onMouseDown={(e) => { e.preventDefault(); setShowNewInput(true) }}
+                className="w-full text-left px-3 py-1.5 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                + New tag
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -250,7 +322,7 @@ function NoteEditor({
             <option key={nb.id} value={nb.id}>{nb.name}</option>
           ))}
         </select>
-        <TagInput tags={tagNames} onChange={handleTagsChange} />
+        <TagSelector tagNames={tagNames} onChange={handleTagsChange} />
       </div>
 
       {/* Toolbar */}
