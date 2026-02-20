@@ -45,7 +45,7 @@ export default function AppShell() {
   const divider = 'border-gray-200 dark:border-gray-700'
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-950">
+    <div className="flex h-dvh overflow-hidden bg-white dark:bg-gray-950">
       {/* Sidebar — 240px */}
       <div className={`w-60 flex-shrink-0 ${mobilePanel === 'sidebar' ? 'flex' : 'hidden'} md:flex`}>
         <Sidebar

@@ -2,10 +2,25 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
+import { Extension } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
+
+const TabIndent = Extension.create({
+  name: 'tabIndent',
+  addKeyboardShortcuts() {
+    return {
+      Tab: () =>
+        this.editor.commands.sinkListItem('listItem') ||
+        this.editor.commands.sinkListItem('taskItem'),
+      'Shift-Tab': () =>
+        this.editor.commands.liftListItem('listItem') ||
+        this.editor.commands.liftListItem('taskItem'),
+    }
+  },
+})
 import type { Note, Notebook, Tag } from '@/lib/types'
 import { tagColorClass } from '@/lib/utils'
 
@@ -189,7 +204,7 @@ function NoteEditor({
 
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [StarterKit, Underline, TaskList, TaskItem.configure({ nested: true })],
+    extensions: [StarterKit, Underline, TaskList, TaskItem.configure({ nested: true }), TabIndent],
     content: parseContent(note.content),
     editorProps: {
       attributes: { class: 'tiptap px-8 py-6 focus:outline-none min-h-full' },
@@ -327,6 +342,8 @@ function NoteEditor({
 
       {/* Toolbar */}
       <div className="flex items-center gap-0.5 px-4 py-1.5 border-t border-b border-gray-100 dark:border-gray-700/50 flex-shrink-0 flex-wrap bg-gray-50/50 dark:bg-transparent">
+        <ToolbarBtn onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()} active={false} title="Clear formatting">Tx</ToolbarBtn>
+        <ToolbarDivider />
         <ToolbarBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="Bold"><strong>B</strong></ToolbarBtn>
         <ToolbarBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="Italic"><em>I</em></ToolbarBtn>
         <ToolbarBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="Underline"><span className="underline">U</span></ToolbarBtn>
@@ -337,6 +354,20 @@ function NoteEditor({
         <ToolbarBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="Bullet List">•—</ToolbarBtn>
         <ToolbarBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="Numbered List">1.</ToolbarBtn>
         <ToolbarBtn onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} title="Task List">☑</ToolbarBtn>
+        <ToolbarBtn
+          onClick={() => {
+            editor.commands.sinkListItem('listItem') || editor.commands.sinkListItem('taskItem')
+          }}
+          active={false}
+          title="Indent"
+        >→</ToolbarBtn>
+        <ToolbarBtn
+          onClick={() => {
+            editor.commands.liftListItem('listItem') || editor.commands.liftListItem('taskItem')
+          }}
+          active={false}
+          title="Outdent"
+        >←</ToolbarBtn>
         <ToolbarDivider />
         <ToolbarBtn onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="Code Block">{'</>'}</ToolbarBtn>
         <ToolbarBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="Blockquote">"</ToolbarBtn>
@@ -344,8 +375,8 @@ function NoteEditor({
       </div>
 
       {/* Editor */}
-      <div className="flex-1 overflow-y-auto">
-        <EditorContent editor={editor} className="h-full" />
+      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <EditorContent editor={editor} />
       </div>
     </div>
   )

@@ -312,6 +312,60 @@ function SortableNotebookRow({
   )
 }
 
+// ─── Tag row with delete ──────────────────────────────────────────────────────
+
+function TagRow({ tag, isActive, onClick, onDeleted }: {
+  tag: Tag; isActive: boolean; onClick: () => void; onDeleted: (id: string) => void
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      await fetch(`/api/tags/${tag.id}`, { method: 'DELETE' })
+      onDeleted(tag.id)
+    } finally {
+      setDeleting(false) }
+  }
+
+  if (confirmDelete) {
+    return (
+      <div className="px-2 py-1.5 rounded bg-red-500/10 border border-red-500/20">
+        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1.5">Delete #{tag.name}?</p>
+        <div className="flex gap-2">
+          <button onClick={handleDelete} disabled={deleting}
+            className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs rounded py-1 transition-colors">
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
+          <button onClick={() => setConfirmDelete(false)}
+            className="px-2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+            Cancel
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center group rounded">
+      <button onClick={onClick}
+        className={`flex-1 flex items-center justify-between px-2 py-1.5 rounded text-sm transition-colors ${
+          isActive
+            ? 'bg-indigo-600/20 text-indigo-600 dark:text-indigo-300'
+            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+        }`}>
+        <span className="truncate">#{tag.name}</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 ml-1">{tag._count?.notes ?? 0}</span>
+      </button>
+      <button onClick={() => setConfirmDelete(true)}
+        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 dark:text-gray-600 hover:text-red-500 text-xs flex-shrink-0">
+        ✕
+      </button>
+    </div>
+  )
+}
+
 // ─── Main Sidebar ─────────────────────────────────────────────────────────────
 
 export default function Sidebar({
@@ -451,6 +505,18 @@ export default function Sidebar({
         </button>
       </nav>
 
+      {/* Export */}
+      <div className="px-2 py-2 flex-shrink-0 border-t border-gray-200 dark:border-gray-700/50">
+        <a
+          href="/api/export"
+          download
+          className="w-full flex items-center gap-2 px-3 py-1.5 rounded text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+        >
+          <span>↓</span>
+          <span>Export backup</span>
+        </a>
+      </div>
+
       {/* Scrollable section */}
       <div className="flex-1 overflow-y-auto px-2 mt-4 space-y-4">
         {/* Notebooks */}
@@ -524,20 +590,16 @@ export default function Sidebar({
                 <p className="text-xs text-gray-400 dark:text-gray-600 px-2 py-1">No tags yet</p>
               )}
               {tags.map((tag) => (
-                <button
+                <TagRow
                   key={tag.id}
+                  tag={tag}
+                  isActive={tagId === tag.id}
                   onClick={() => onNavigate({ tagId: tag.id, notebookId: null, view: 'all', noteId: null })}
-                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-sm transition-colors ${
-                    tagId === tag.id
-                      ? 'bg-indigo-600/20 text-indigo-600 dark:text-indigo-300'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  <span className="truncate">#{tag.name}</span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 ml-1">
-                    {tag._count?.notes ?? 0}
-                  </span>
-                </button>
+                  onDeleted={(id) => {
+                    setTags((prev) => prev.filter((t) => t.id !== id))
+                    if (tagId === id) onNavigate({ tagId: null, view: 'all', noteId: null })
+                  }}
+                />
               ))}
 
               {showNewTag ? (
