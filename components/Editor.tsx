@@ -22,7 +22,7 @@ const TabIndent = Extension.create({
   },
 })
 import type { Note, Notebook, Tag } from '@/lib/types'
-import { tagColorClass } from '@/lib/utils'
+import { tagStyle } from '@/lib/utils'
 
 interface EditorProps {
   noteId: string | null
@@ -68,6 +68,10 @@ function TagSelector({ tagNames, onChange }: { tagNames: string[]; onChange: (ta
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    fetch('/api/tags').then((r) => r.ok ? r.json() : []).then(setAllTags)
+  }, [])
+
+  useEffect(() => {
     if (!showDropdown) return
     fetch('/api/tags').then((r) => r.ok ? r.json() : []).then(setAllTags)
   }, [showDropdown])
@@ -109,12 +113,15 @@ function TagSelector({ tagNames, onChange }: { tagNames: string[]; onChange: (ta
   return (
     <div className="relative" ref={dropdownRef}>
       <div className="flex flex-wrap items-center gap-1.5">
-        {tagNames.map((tag) => (
-          <span key={tag} className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${tagColorClass(tag)}`}>
-            {tag}
-            <button onClick={() => toggleTag(tag)} className="opacity-60 hover:opacity-100 leading-none">×</button>
-          </span>
-        ))}
+        {tagNames.map((tag) => {
+          const color = allTags.find((t) => t.name === tag)?.color ?? '#6366f1'
+          return (
+            <span key={tag} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium" style={tagStyle(color)}>
+              {tag}
+              <button onClick={() => toggleTag(tag)} className="opacity-60 hover:opacity-100 leading-none">×</button>
+            </span>
+          )
+        })}
         <button
           onMouseDown={(e) => { e.preventDefault(); setShowDropdown((s) => !s) }}
           className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -135,7 +142,7 @@ function TagSelector({ tagNames, onChange }: { tagNames: string[]; onChange: (ta
               className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
             >
               <span className={`w-3.5 h-3.5 flex items-center justify-center text-indigo-500 flex-shrink-0 ${tagNames.includes(tag.name) ? 'opacity-100' : 'opacity-0'}`}>✓</span>
-              <span className={`px-1.5 py-0.5 rounded-full font-medium ${tagColorClass(tag.name)}`}>{tag.name}</span>
+              <span className="px-1.5 py-0.5 rounded-full font-medium" style={tagStyle(tag.color ?? '#6366f1')}>{tag.name}</span>
             </button>
           ))}
           <div className="border-t border-gray-100 dark:border-gray-700 mt-1 pt-1">

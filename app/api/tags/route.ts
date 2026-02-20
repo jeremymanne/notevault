@@ -19,7 +19,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name } = body
+    const { name, color } = body
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     const tag = await prisma.tag.upsert({
       where: { name },
-      create: { name },
+      create: { name, ...(color ? { color } : {}) },
       update: {},
       include: {
         _count: { select: { notes: true } },

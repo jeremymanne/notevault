@@ -1,3 +1,5 @@
+import type React from 'react'
+
 export function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString)
   const now = new Date()
@@ -80,4 +82,11 @@ export function tagColorClass(tagName: string): string {
     hash = tagName.charCodeAt(i) + ((hash << 5) - hash)
   }
   return TAG_COLOR_CLASSES[Math.abs(hash) % TAG_COLOR_CLASSES.length]
+}
+
+export function tagStyle(color: string): React.CSSProperties {
+  return {
+    backgroundColor: color + '33',
+    color: color,
+  }
 }

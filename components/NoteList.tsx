@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Note } from '@/lib/types'
-import { formatRelativeTime, extractTextPreview, tagColorClass } from '@/lib/utils'
+import { formatRelativeTime, extractTextPreview, tagStyle } from '@/lib/utils'
 
 interface NoteListProps {
   view: string
@@ -97,7 +97,8 @@ function SortableNoteCard({
             {note.tags.slice(0, 3).map((nt) => (
               <span
                 key={nt.tagId}
-                className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${tagColorClass(nt.tag.name)}`}
+                className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                style={tagStyle(nt.tag.color ?? '#6366f1')}
               >
                 {nt.tag.name}
               </span>

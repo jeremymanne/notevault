@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Notebook, Tag } from '@/lib/types'
-import { NOTEBOOK_COLORS } from '@/lib/utils'
+import { NOTEBOOK_COLORS, tagStyle } from '@/lib/utils'
 import { extractTasksFromContent } from '@/lib/taskUtils'
 
 interface SidebarProps {
@@ -108,6 +108,7 @@ function NewNotebookForm({ onCreated, onCancel }: { onCreated: (nb: Notebook) =>
 
 function NewTagForm({ onCreated, onCancel }: { onCreated: (tag: Tag) => void; onCancel: () => void }) {
   const [name, setName] = useState('')
+  const [color, setColor] = useState(NOTEBOOK_COLORS[0])
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -119,7 +120,7 @@ function NewTagForm({ onCreated, onCancel }: { onCreated: (tag: Tag) => void; on
       const res = await fetch('/api/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify({ name: trimmed, color }),
       })
       if (res.ok) onCreated(await res.json())
     } finally { setSaving(false) }
@@ -131,6 +132,7 @@ function NewTagForm({ onCreated, onCancel }: { onCreated: (tag: Tag) => void; on
         onChange={(e) => setName(e.target.value)}
         className="w-full bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white text-sm rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-400 dark:placeholder-gray-500"
       />
+      <ColorPicker value={color} onChange={setColor} />
       <div className="flex gap-2">
         <button type="submit" disabled={saving || !name.trim()}
           className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs rounded py-1 transition-colors">
@@ -312,21 +314,54 @@ function SortableNotebookRow({
   )
 }
 
-// ─── Tag row with delete ──────────────────────────────────────────────────────
+// ─── Tag row with edit/delete ─────────────────────────────────────────────────
 
-function TagRow({ tag, isActive, onClick, onDeleted }: {
-  tag: Tag; isActive: boolean; onClick: () => void; onDeleted: (id: string) => void
+function TagRow({ tag, isActive, onClick, onUpdated, onDeleted }: {
+  tag: Tag; isActive: boolean; onClick: () => void
+  onUpdated: (tag: Tag) => void; onDeleted: (id: string) => void
 }) {
+  const [editMode, setEditMode] = useState(false)
+  const [editColor, setEditColor] = useState(tag.color)
+  const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  async function handleSaveColor() {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/tags/${tag.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ color: editColor }),
+      })
+      if (res.ok) { onUpdated(await res.json()); setEditMode(false) }
+    } finally { setSaving(false) }
+  }
 
   async function handleDelete() {
     setDeleting(true)
     try {
       await fetch(`/api/tags/${tag.id}`, { method: 'DELETE' })
       onDeleted(tag.id)
-    } finally {
-      setDeleting(false) }
+    } finally { setDeleting(false) }
+  }
+
+  if (editMode) {
+    return (
+      <div className="px-2 py-2 space-y-2">
+        <ColorPicker value={editColor} onChange={setEditColor} />
+        <div className="flex gap-2">
+          <button onClick={handleSaveColor} disabled={saving}
+            className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs rounded py-1 transition-colors">
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button onClick={() => { setEditMode(false); setEditColor(tag.color) }}
+            className="px-2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+            Cancel
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (confirmDelete) {
@@ -350,18 +385,26 @@ function TagRow({ tag, isActive, onClick, onDeleted }: {
   return (
     <div className="flex items-center group rounded">
       <button onClick={onClick}
-        className={`flex-1 flex items-center justify-between px-2 py-1.5 rounded text-sm transition-colors ${
+        className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors ${
           isActive
             ? 'bg-indigo-600/20 text-indigo-600 dark:text-indigo-300'
             : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
         }`}>
-        <span className="truncate">#{tag.name}</span>
-        <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 ml-1">{tag._count?.notes ?? 0}</span>
+        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+        <span className="flex-1 truncate text-left">#{tag.name}</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">{tag._count?.notes ?? 0}</span>
       </button>
-      <button onClick={() => setConfirmDelete(true)}
-        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 dark:text-gray-600 hover:text-red-500 text-xs flex-shrink-0">
-        ✕
-      </button>
+      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center flex-shrink-0">
+        <button onClick={(e) => { e.stopPropagation(); setEditMode(true) }}
+          title="Change color"
+          className="p-1 text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 transition-colors text-xs">
+          ✎
+        </button>
+        <button onClick={() => setConfirmDelete(true)}
+          className="p-1 text-gray-400 dark:text-gray-600 hover:text-red-500 text-xs">
+          ✕
+        </button>
+      </div>
     </div>
   )
 }
@@ -452,6 +495,10 @@ export default function Sidebar({
   function handleTagCreated(tag: Tag) {
     setTags((prev) => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)))
     setShowNewTag(false)
+  }
+
+  function handleTagUpdated(updated: Tag) {
+    setTags((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
   }
 
   const navBase = 'w-full text-left px-3 py-1.5 rounded text-sm transition-colors'
@@ -595,6 +642,7 @@ export default function Sidebar({
                   tag={tag}
                   isActive={tagId === tag.id}
                   onClick={() => onNavigate({ tagId: tag.id, notebookId: null, view: 'all', noteId: null })}
+                  onUpdated={handleTagUpdated}
                   onDeleted={(id) => {
                     setTags((prev) => prev.filter((t) => t.id !== id))
                     if (tagId === id) onNavigate({ tagId: null, view: 'all', noteId: null })
