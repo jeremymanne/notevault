@@ -7,10 +7,12 @@ export async function GET(request: NextRequest) {
     const notebookId = searchParams.get('notebookId')
     const tagId = searchParams.get('tagId')
     const pinned = searchParams.get('pinned')
+    const archive = searchParams.get('archive')
     const search = searchParams.get('search')
 
     const notes = await prisma.note.findMany({
       where: {
+        isArchived: archive === 'true',
         ...(notebookId ? { notebookId } : {}),
         ...(tagId ? { tags: { some: { tagId } } } : {}),
         ...(pinned === 'true' ? { isPinned: true } : {}),

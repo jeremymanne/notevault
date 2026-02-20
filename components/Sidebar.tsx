@@ -508,6 +508,7 @@ export default function Sidebar({
   const isAllNotes = view === 'all' && !notebookId && !tagId
   const isPinned = view === 'pinned'
   const isTasks = view === 'tasks'
+  const isArchive = view === 'archive'
 
   return (
     <aside className="w-full bg-gray-100 dark:bg-gray-900 flex flex-col h-full overflow-hidden">
@@ -531,7 +532,7 @@ export default function Sidebar({
           onClick={() => onNavigate({ view: 'all', notebookId: null, tagId: null, noteId: null })}
           className={`${navBase} ${isAllNotes ? navActive : navInactive}`}
         >
-          All Notes
+          Open Notes
         </button>
         <button
           onClick={() => onNavigate({ view: 'pinned', notebookId: null, tagId: null, noteId: null })}
@@ -549,6 +550,12 @@ export default function Sidebar({
               {incompleteTaskCount > 99 ? '99+' : incompleteTaskCount}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => onNavigate({ view: 'archive', notebookId: null, tagId: null, noteId: null })}
+          className={`${navBase} ${isArchive ? navActive : navInactive}`}
+        >
+          Archive
         </button>
       </nav>
 

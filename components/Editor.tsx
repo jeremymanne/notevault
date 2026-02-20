@@ -30,6 +30,7 @@ interface EditorProps {
   onNoteDeleted: () => void
   onNoteChanged: () => void
   onNotePinChanged: () => void
+  onNoteArchived: () => void
 }
 
 // ─── Toolbar button ───────────────────────────────────────────────────────────
@@ -178,14 +179,15 @@ function TagSelector({ tagNames, onChange }: { tagNames: string[]; onChange: (ta
 // ─── Note editor (re-mounts on noteId change via key prop) ────────────────────
 
 function NoteEditor({
-  note, onNoteDeleted, onNoteChanged, onNotePinChanged, onMobileBack,
+  note, onNoteDeleted, onNoteChanged, onNotePinChanged, onNoteArchived, onMobileBack,
 }: {
-  note: Note; onNoteDeleted: () => void; onNoteChanged: () => void; onNotePinChanged: () => void; onMobileBack: () => void
+  note: Note; onNoteDeleted: () => void; onNoteChanged: () => void; onNotePinChanged: () => void; onNoteArchived: () => void; onMobileBack: () => void
 }) {
   const [title, setTitle] = useState(note.title)
   const [notebookId, setNotebookId] = useState<string | null>(note.notebookId)
   const [tagNames, setTagNames] = useState<string[]>(note.tags.map((nt) => nt.tag.name))
   const [isPinned, setIsPinned] = useState(note.isPinned)
+  const [isArchived, setIsArchived] = useState(note.isArchived)
   const [notebooks, setNotebooks] = useState<Notebook[]>([])
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -260,6 +262,17 @@ function NoteEditor({
     onNotePinChanged()
   }
 
+  async function toggleArchive() {
+    const next = !isArchived
+    setIsArchived(next)
+    await fetch(`/api/notes/${note.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isArchived: next }),
+    })
+    onNoteArchived()
+  }
+
   async function handleDelete() {
     await fetch(`/api/notes/${note.id}`, { method: 'DELETE' })
     onNoteDeleted()
@@ -297,6 +310,19 @@ function NoteEditor({
           >
             📌
             {isPinned && <span className="text-xs font-medium">Pinned</span>}
+          </button>
+
+          <button
+            onClick={toggleArchive}
+            title={isArchived ? 'Unarchive' : 'Archive'}
+            className={`px-2 py-1 rounded text-sm transition-colors flex items-center gap-1 ${
+              isArchived
+                ? 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                : 'text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400'
+            }`}
+          >
+            📦
+            {isArchived && <span className="text-xs font-medium">Archived</span>}
           </button>
 
           {confirmDelete ? (
@@ -391,7 +417,7 @@ function NoteEditor({
 
 // ─── Outer wrapper ────────────────────────────────────────────────────────────
 
-export default function Editor({ noteId, onMobileBack, onNoteDeleted, onNoteChanged, onNotePinChanged }: EditorProps) {
+export default function Editor({ noteId, onMobileBack, onNoteDeleted, onNoteChanged, onNotePinChanged, onNoteArchived }: EditorProps) {
   const [note, setNote] = useState<Note | null>(null)
   const [loading, setLoading] = useState(false)
   const [notFound, setNotFound] = useState(false)
@@ -437,6 +463,6 @@ export default function Editor({ noteId, onMobileBack, onNoteDeleted, onNoteChan
   }
 
   return (
-    <NoteEditor key={noteId} note={note} onNoteDeleted={onNoteDeleted} onNoteChanged={onNoteChanged} onNotePinChanged={onNotePinChanged} onMobileBack={onMobileBack} />
+    <NoteEditor key={noteId} note={note} onNoteDeleted={onNoteDeleted} onNoteChanged={onNoteChanged} onNotePinChanged={onNotePinChanged} onNoteArchived={onNoteArchived} onMobileBack={onMobileBack} />
   )
 }

@@ -26,6 +26,7 @@ export interface Note {
   title: string
   content: string
   isPinned: boolean
+  isArchived: boolean
   sortOrder: number
   createdAt: string
   updatedAt: string

@@ -62,7 +62,7 @@ function SortableNoteCard({
         {...attributes}
         {...listeners}
         onClick={(e) => e.stopPropagation()}
-        className="w-5 flex-shrink-0 flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+        className="w-5 flex-shrink-0 flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing opacity-20 group-hover:opacity-100 transition-opacity text-xs"
         aria-label="Drag to reorder"
       >
         ⠿
@@ -90,7 +90,10 @@ function SortableNoteCard({
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex flex-wrap gap-1">
             {note.notebook && (
-              <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300">
+              <span
+                className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                style={tagStyle(note.notebook.color)}
+              >
                 {note.notebook.name}
               </span>
             )}
@@ -173,6 +176,7 @@ export default function NoteList({
     if (notebookId) params.set('notebookId', notebookId)
     if (tagId) params.set('tagId', tagId)
     if (view === 'pinned') params.set('pinned', 'true')
+    if (view === 'archive') params.set('archive', 'true')
     if (debouncedSearch) params.set('search', debouncedSearch)
     try {
       const res = await fetch(`/api/notes?${params}`)
@@ -245,9 +249,10 @@ export default function NoteList({
 
   function viewTitle() {
     if (view === 'pinned') return 'Pinned'
+    if (view === 'archive') return 'Archive'
     if (tagId) return 'Tagged'
     if (notebookId) return ''
-    return 'All Notes'
+    return 'Open Notes'
   }
 
   return (
@@ -262,13 +267,15 @@ export default function NoteList({
             ‹
           </button>
           <span className="text-sm font-semibold text-gray-800 dark:text-white truncate flex-1">{viewTitle()}</span>
-          <button
-            onClick={createNote}
-            disabled={creating}
-            className="flex-shrink-0 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium px-2.5 py-1.5 rounded-md transition-colors"
-          >
-            {creating ? '…' : '+ New'}
-          </button>
+          {view !== 'archive' && (
+            <button
+              onClick={createNote}
+              disabled={creating}
+              className="flex-shrink-0 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium px-2.5 py-1.5 rounded-md transition-colors"
+            >
+              {creating ? '…' : '+ New'}
+            </button>
+          )}
         </div>
         <input
           type="text"

@@ -91,6 +91,12 @@ export default function AppShell() {
               refreshSidebar()
               refreshNoteList()
             }}
+            onNoteArchived={() => {
+              navigate({ noteId: null })
+              setMobilePanel('list')
+              refreshSidebar()
+              refreshNoteList()
+            }}
             onNoteChanged={refreshSidebar}
             onNotePinChanged={refreshNoteList}
           />

@@ -29,13 +29,14 @@ export async function PUT(
   try {
     const { id } = await params
     const body = await request.json()
-    const { title, content, isPinned, notebookId, tags } = body
+    const { title, content, isPinned, isArchived, notebookId, tags } = body
 
     // Update note fields
     const updateData: Record<string, unknown> = {}
     if (title !== undefined) updateData.title = title
     if (content !== undefined) updateData.content = content
     if (isPinned !== undefined) updateData.isPinned = isPinned
+    if (isArchived !== undefined) updateData.isArchived = isArchived
     if (notebookId !== undefined) updateData.notebookId = notebookId
 
     // Handle tags: replace all existing with new set
