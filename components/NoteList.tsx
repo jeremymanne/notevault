@@ -119,6 +119,35 @@ function SortableNoteCard({
   )
 }
 
+// ─── Archived note card (non-draggable) ───────────────────────────────────────
+
+function ArchivedNoteCard({ note, isSelected, onClick }: { note: Note; isSelected: boolean; onClick: () => void }) {
+  const preview = extractTextPreview(note.content)
+  return (
+    <div
+      onClick={onClick}
+      className={`flex items-stretch border-b border-gray-100 dark:border-gray-700/50 cursor-pointer transition-colors opacity-50 hover:opacity-75 ${
+        isSelected ? 'bg-indigo-50 dark:bg-gray-700/60' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'
+      }`}
+    >
+      <div className="flex-1 px-3 py-3 min-w-0">
+        <div className="flex items-start justify-between gap-1 mb-1">
+          <span className="text-sm font-medium text-gray-900 dark:text-white truncate leading-tight line-through">
+            {note.title || 'Untitled'}
+          </span>
+          <span className="flex items-center gap-0.5 text-xs text-gray-400 font-medium flex-shrink-0 bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
+            📦 Archived
+          </span>
+        </div>
+        {preview && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mb-1.5 leading-relaxed">{preview}</p>
+        )}
+        <span className="text-xs text-gray-400 dark:text-gray-500">{formatRelativeTime(note.updatedAt)}</span>
+      </div>
+    </div>
+  )
+}
+
 // ─── Loading skeleton ─────────────────────────────────────────────────────────
 
 function NoteCardSkeleton() {
@@ -177,6 +206,7 @@ export default function NoteList({
     if (tagId) params.set('tagId', tagId)
     if (view === 'pinned') params.set('pinned', 'true')
     if (view === 'archive') params.set('archive', 'true')
+    if ((notebookId || tagId) && view !== 'archive') params.set('includeArchived', 'true')
     if (debouncedSearch) params.set('search', debouncedSearch)
     try {
       const res = await fetch(`/api/notes?${params}`)
@@ -210,8 +240,10 @@ export default function NoteList({
     }
   }
 
-  const pinnedNotes = notes.filter((n) => n.isPinned)
-  const unpinnedNotes = notes.filter((n) => !n.isPinned)
+  const activeNotes = notes.filter((n) => !n.isArchived)
+  const archivedNotes = notes.filter((n) => n.isArchived)
+  const pinnedNotes = activeNotes.filter((n) => n.isPinned)
+  const unpinnedNotes = activeNotes.filter((n) => !n.isPinned)
 
   async function persistReorder(reordered: Note[]) {
     await fetch('/api/notes/reorder', {
@@ -229,7 +261,7 @@ export default function NoteList({
       pinnedNotes.findIndex((n) => n.id === active.id),
       pinnedNotes.findIndex((n) => n.id === over.id)
     )
-    const next = [...reordered, ...unpinnedNotes]
+    const next = [...reordered, ...unpinnedNotes, ...archivedNotes]
     setNotes(next)
     persistReorder(next)
   }
@@ -242,7 +274,7 @@ export default function NoteList({
       unpinnedNotes.findIndex((n) => n.id === active.id),
       unpinnedNotes.findIndex((n) => n.id === over.id)
     )
-    const next = [...pinnedNotes, ...reordered]
+    const next = [...pinnedNotes, ...reordered, ...archivedNotes]
     setNotes(next)
     persistReorder(next)
   }
@@ -312,6 +344,12 @@ export default function NoteList({
           </div>
         ) : (
           <>
+            {activeNotes.length === 0 && archivedNotes.length > 0 && (
+              <div className="flex flex-col items-center justify-center h-24 px-4 text-center">
+                <p className="text-gray-400 dark:text-gray-500 text-sm">All notes are archived.</p>
+              </div>
+            )}
+
             {pinnedNotes.length > 0 && (
               <div>
                 <GroupLabel>Pinned</GroupLabel>
@@ -335,6 +373,15 @@ export default function NoteList({
                     ))}
                   </SortableContext>
                 </DndContext>
+              </div>
+            )}
+
+            {archivedNotes.length > 0 && (notebookId || tagId) && (
+              <div>
+                <GroupLabel>Archived</GroupLabel>
+                {archivedNotes.map((note) => (
+                  <ArchivedNoteCard key={note.id} note={note} isSelected={note.id === selectedNoteId} onClick={() => onSelectNote(note.id)} />
+                ))}
               </div>
             )}
           </>
