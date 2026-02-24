@@ -115,7 +115,7 @@ function DayRow({
         }`}>
           {dayNum}
         </span>
-        {items.length === 0 && !adding && (
+        {!adding && (
           <button
             onClick={() => setAdding(true)}
             className="ml-auto text-gray-300 dark:text-gray-600 hover:text-indigo-500 dark:hover:text-indigo-400 text-xs transition-colors"
@@ -155,21 +155,14 @@ function DayRow({
         </div>
       ))}
 
-      {/* Add form / button */}
-      {adding ? (
+      {/* Add form */}
+      {adding && (
         <div className="ml-1">
           <InlineAddForm
             onSubmit={(text) => { onAdd(dateStr, text); setAdding(false) }}
             onCancel={() => setAdding(false)}
           />
         </div>
-      ) : items.length > 0 && (
-        <button
-          onClick={() => setAdding(true)}
-          className="ml-1 text-gray-300 dark:text-gray-600 hover:text-indigo-500 dark:hover:text-indigo-400 text-xs transition-colors"
-        >
-          +
-        </button>
       )}
     </div>
   )
