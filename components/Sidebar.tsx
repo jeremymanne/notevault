@@ -434,22 +434,27 @@ export default function Sidebar({
   }, [])
 
   const fetchData = useCallback(async () => {
-    const [nbRes, tagRes, noteRes] = await Promise.all([
+    const [nbRes, tagRes, noteRes, plannerRes] = await Promise.all([
       fetch('/api/notebooks'),
       fetch('/api/tags'),
       fetch('/api/notes'),
+      fetch('/api/planner'),
     ])
     if (nbRes.ok) setNotebooks(await nbRes.json())
     if (tagRes.ok) setTags(await tagRes.json())
+    let count = 0
     if (noteRes.ok) {
       const notes = await noteRes.json()
-      let count = 0
       for (const n of notes) {
         const tasks = extractTasksFromContent(n.content, n.id, n.title)
         count += tasks.filter((t) => !t.checked).length
       }
-      setIncompleteTaskCount(count)
     }
+    if (plannerRes.ok) {
+      const plannerItems = await plannerRes.json()
+      count += plannerItems.filter((i: { isCompleted: boolean }) => !i.isCompleted).length
+    }
+    setIncompleteTaskCount(count)
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData, refreshKey])

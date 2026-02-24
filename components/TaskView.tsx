@@ -10,7 +10,7 @@ import {
   SortableContext, useSortable, verticalListSortingStrategy, arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { Note, Notebook } from '@/lib/types'
+import type { Note, Notebook, PlannerItem } from '@/lib/types'
 import {
   ExtractedTask, ExtractedHeading, NoteGroupItem,
   extractTasksFromContent, extractItemsFromContent,
@@ -326,6 +326,140 @@ function NewGroupForm({
   )
 }
 
+// ─── Accordion section header ────────────────────────────────────────────────
+
+function AccordionHeader({
+  label,
+  incompleteCount,
+  isOpen,
+  onToggle,
+  trailing,
+}: {
+  label: string
+  incompleteCount: number
+  isOpen: boolean
+  onToggle: () => void
+  trailing?: React.ReactNode
+}) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 mb-1">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-2 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+      >
+        <span className="text-xs text-gray-400 dark:text-gray-500 w-4 text-center">
+          {isOpen ? '▾' : '▸'}
+        </span>
+        <span className="text-gray-800 dark:text-white font-semibold text-sm">
+          {label}
+        </span>
+        <span className="text-xs text-gray-400 dark:text-gray-500">
+          ({incompleteCount})
+        </span>
+      </button>
+      {trailing}
+    </div>
+  )
+}
+
+// ─── Planner section ─────────────────────────────────────────────────────────
+
+function formatPlannerDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+function PlannerSection({
+  items,
+  filter,
+  isOpen,
+  onToggleOpen,
+  onToggle,
+  onDelete,
+  onGoToPlanner,
+}: {
+  items: PlannerItem[]
+  filter: Filter
+  isOpen: boolean
+  onToggleOpen: () => void
+  onToggle: (item: PlannerItem) => void
+  onDelete: (item: PlannerItem) => void
+  onGoToPlanner: () => void
+}) {
+  const visible = filter === 'incomplete' ? items.filter((i) => !i.isCompleted) : items
+  const incompleteCount = items.filter((i) => !i.isCompleted).length
+  if (visible.length === 0 && incompleteCount === 0) return null
+
+  // Group by date
+  const byDate = new Map<string, PlannerItem[]>()
+  for (const item of visible) {
+    const existing = byDate.get(item.date) ?? []
+    existing.push(item)
+    byDate.set(item.date, existing)
+  }
+  const sortedDates = [...byDate.keys()].sort()
+
+  return (
+    <div className="mb-4">
+      <AccordionHeader
+        label="Planner"
+        incompleteCount={incompleteCount}
+        isOpen={isOpen}
+        onToggle={onToggleOpen}
+        trailing={
+          <button
+            onClick={onGoToPlanner}
+            className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-400 dark:hover:text-indigo-300 transition-colors ml-1"
+          >
+            Open planner →
+          </button>
+        }
+      />
+
+      {isOpen && sortedDates.map((date) => (
+        <div key={date}>
+          <div className="px-3 pt-2 pb-0.5 ml-6">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+              {formatPlannerDate(date)}
+            </span>
+          </div>
+          {byDate.get(date)!.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center gap-2 px-3 py-2 ml-6 group hover:bg-gray-100 dark:hover:bg-gray-800/50 rounded-md transition-colors"
+            >
+              <span
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: item.color }}
+              />
+              <input
+                type="checkbox"
+                checked={item.isCompleted}
+                onChange={() => onToggle(item)}
+                className="flex-shrink-0 w-4 h-4 cursor-pointer accent-indigo-500 rounded"
+              />
+              <span className={`flex-1 text-sm ${
+                item.isCompleted
+                  ? 'line-through text-gray-400 dark:text-gray-500'
+                  : 'text-gray-800 dark:text-gray-200'
+              }`}>
+                {item.text}
+              </span>
+              <button
+                onClick={() => onDelete(item)}
+                className="flex-shrink-0 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-sm leading-none"
+                aria-label="Delete"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Main TaskView ────────────────────────────────────────────────────────────
 
 export default function TaskView({ onNavigate }: TaskViewProps) {
@@ -339,19 +473,24 @@ export default function TaskView({ onNavigate }: TaskViewProps) {
   const [showNewGroup, setShowNewGroup] = useState(false)
   const [notebooks, setNotebooks] = useState<Notebook[]>([])
   const [pendingNewGroupId, setPendingNewGroupId] = useState<string | null>(null)
+  const [plannerItems, setPlannerItems] = useState<PlannerItem[]>([])
+  const [plannerOpen, setPlannerOpen] = useState(true)
+  const [tasksOpen, setTasksOpen] = useState(true)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const loadTasks = useCallback(async () => {
     setLoading(true); setError(false)
     try {
-      const [notesRes, notebooksRes] = await Promise.all([
+      const [notesRes, notebooksRes, plannerRes] = await Promise.all([
         fetch('/api/notes'),
         fetch('/api/notebooks'),
+        fetch('/api/planner'),
       ])
       if (!notesRes.ok) { setError(true); return }
       const notes: Note[] = await notesRes.json()
       if (notebooksRes.ok) setNotebooks(await notebooksRes.json())
+      if (plannerRes.ok) setPlannerItems(await plannerRes.json())
       setGroups(
         notes
           .map((note) => ({
@@ -455,6 +594,31 @@ export default function TaskView({ onNavigate }: TaskViewProps) {
     }
   }
 
+  async function handlePlannerToggle(item: PlannerItem) {
+    const newCompleted = !item.isCompleted
+    setPlannerItems((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, isCompleted: newCompleted } : i))
+    )
+    try {
+      await fetch(`/api/planner/${item.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isCompleted: newCompleted }),
+      })
+    } catch { /* ignore */ }
+  }
+
+  async function handlePlannerDelete(item: PlannerItem) {
+    setPlannerItems((prev) => prev.filter((i) => i.id !== item.id))
+    try {
+      await fetch(`/api/planner/${item.id}`, { method: 'DELETE' })
+    } catch { /* ignore */ }
+  }
+
+  function goToPlanner() {
+    onNavigate({ view: 'planner', notebookId: null, tagId: null, noteId: null })
+  }
+
   function goToNote(noteId: string) {
     onNavigate({ view: 'all', noteId, notebookId: null, tagId: null })
   }
@@ -496,7 +660,10 @@ export default function TaskView({ onNavigate }: TaskViewProps) {
 
   const allTasks = groups.flatMap((g) => g.tasks)
   const incompleteTasks = allTasks.filter((t) => !t.checked)
+  const incompletePlannerItems = plannerItems.filter((i) => !i.isCompleted)
+  const totalIncomplete = incompleteTasks.length + incompletePlannerItems.length
   const notesWithIncompleteTasks = new Set(incompleteTasks.map((t) => t.noteId)).size
+  const sourceCount = notesWithIncompleteTasks + (incompletePlannerItems.length > 0 ? 1 : 0)
   const visibleGroups = groups.filter((g) => {
     if (g.noteId === pendingNewGroupId) return true
     return filter === 'incomplete' ? g.tasks.some((t) => !t.checked) : g.items.length > 0 || g.tasks.length > 0
@@ -507,15 +674,7 @@ export default function TaskView({ onNavigate }: TaskViewProps) {
       {/* Header */}
       <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 bg-gray-50 dark:bg-gray-900">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
-            <h2 className="text-gray-900 dark:text-white font-semibold text-base">Tasks</h2>
-            <button
-              onClick={() => setShowNewGroup(true)}
-              className="text-xs text-gray-400 dark:text-gray-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors font-medium"
-            >
-              + New Group
-            </button>
-          </div>
+          <h2 className="text-gray-900 dark:text-white font-semibold text-base">Tasks</h2>
           <div className="flex items-center bg-gray-200 dark:bg-gray-800 rounded-lg p-0.5">
             {(['incomplete', 'all'] as Filter[]).map((f) => (
               <button
@@ -533,14 +692,14 @@ export default function TaskView({ onNavigate }: TaskViewProps) {
 
         {!loading && !error && (
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {incompleteTasks.length === 0 ? (
+            {totalIncomplete === 0 ? (
               <span className="text-green-600 dark:text-green-400">No incomplete tasks — you&apos;re all caught up! 🎉</span>
             ) : (
               <>
-                <span className="text-gray-800 dark:text-white font-medium">{incompleteTasks.length}</span>
-                {' task'}{incompleteTasks.length !== 1 ? 's' : ''}{' remaining across '}
-                <span className="text-gray-800 dark:text-white font-medium">{notesWithIncompleteTasks}</span>
-                {' note'}{notesWithIncompleteTasks !== 1 ? 's' : ''}
+                <span className="text-gray-800 dark:text-white font-medium">{totalIncomplete}</span>
+                {' task'}{totalIncomplete !== 1 ? 's' : ''}{' remaining across '}
+                <span className="text-gray-800 dark:text-white font-medium">{sourceCount}</span>
+                {' source'}{sourceCount !== 1 ? 's' : ''}
               </>
             )}
           </p>
@@ -565,28 +724,57 @@ export default function TaskView({ onNavigate }: TaskViewProps) {
                 onCancel={() => setShowNewGroup(false)}
               />
             )}
-            {visibleGroups.length === 0 && !showNewGroup ? (
+            <PlannerSection
+              items={plannerItems}
+              filter={filter}
+              isOpen={plannerOpen}
+              onToggleOpen={() => setPlannerOpen((o) => !o)}
+              onToggle={handlePlannerToggle}
+              onDelete={handlePlannerDelete}
+              onGoToPlanner={goToPlanner}
+            />
+            {visibleGroups.length === 0 && !showNewGroup && plannerItems.length === 0 ? (
               <div className="flex items-center justify-center h-32">
                 <p className="text-gray-400 dark:text-gray-500 text-sm">No tasks yet — create a group to get started.</p>
               </div>
             ) : (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                {visibleGroups.map((group) => (
-                  <NoteGroup
-                    key={group.noteId}
-                    group={group}
-                    filter={filter}
-                    onTaskToggle={handleToggle}
-                    onTaskDelete={handleDeleteTask}
-                    onGoToNote={goToNote}
-                    onAddItem={handleAddItem}
-                    onCreateNote={() => setShowNewGroup(true)}
-                    isNew={pendingNewGroupId === group.noteId}
-                    onNewGroupSettled={pendingNewGroupId === group.noteId ? () => setPendingNewGroupId(null) : undefined}
-                  />
-                ))}
-                <DragOverlay>{activeTask && <DragCard task={activeTask} />}</DragOverlay>
-              </DndContext>
+              <div className="mb-4">
+                <AccordionHeader
+                  label="Tasks"
+                  incompleteCount={incompleteTasks.length}
+                  isOpen={tasksOpen}
+                  onToggle={() => setTasksOpen((o) => !o)}
+                  trailing={
+                    <button
+                      onClick={() => setShowNewGroup(true)}
+                      className="text-xs text-gray-400 dark:text-gray-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors font-medium ml-1"
+                    >
+                      + New Group
+                    </button>
+                  }
+                />
+                {tasksOpen && (
+                  <div className="ml-6">
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                      {visibleGroups.map((group) => (
+                        <NoteGroup
+                          key={group.noteId}
+                          group={group}
+                          filter={filter}
+                          onTaskToggle={handleToggle}
+                          onTaskDelete={handleDeleteTask}
+                          onGoToNote={goToNote}
+                          onAddItem={handleAddItem}
+                          onCreateNote={() => setShowNewGroup(true)}
+                          isNew={pendingNewGroupId === group.noteId}
+                          onNewGroupSettled={pendingNewGroupId === group.noteId ? () => setPendingNewGroupId(null) : undefined}
+                        />
+                      ))}
+                      <DragOverlay>{activeTask && <DragCard task={activeTask} />}</DragOverlay>
+                    </DndContext>
+                  </div>
+                )}
+              </div>
             )}
           </>
         )}
