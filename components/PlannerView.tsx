@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { PlannerItem } from '@/lib/types'
+import type { PlannerItem, CalendarEvent } from '@/lib/types'
 import { NOTEBOOK_COLORS } from '@/lib/utils'
 
 // ─── Date helpers ────────────────────────────────────────────────────────────
@@ -212,6 +212,7 @@ function PlannerItemRow({
 function DayColumn({
   date,
   items,
+  events,
   isToday,
   isPast,
   onAdd,
@@ -221,6 +222,7 @@ function DayColumn({
 }: {
   date: Date
   items: PlannerItem[]
+  events: CalendarEvent[]
   isToday: boolean
   isPast: boolean
   onAdd: (date: string, text: string, color: string) => void
@@ -279,6 +281,25 @@ function DayColumn({
 
       {/* Items */}
       <div className="px-2 py-1.5 flex-1 space-y-0.5">
+        {/* Calendar events */}
+        {events.map((event) => (
+          <div key={event.id} className="flex items-center gap-1.5 py-0.5">
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: event.feedColor }}
+            />
+            <span className="flex-1 text-xs truncate text-gray-600 dark:text-gray-400">
+              {event.title}
+            </span>
+            {event.startTime && (
+              <span className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0">
+                {event.startTime}
+              </span>
+            )}
+          </div>
+        ))}
+
+        {/* Planner items */}
         {items.map((item) => (
           <PlannerItemRow
             key={item.id}
@@ -316,6 +337,7 @@ function DayColumn({
 function WeekRow({
   weekStart,
   items,
+  events,
   today,
   onAdd,
   onToggle,
@@ -325,6 +347,7 @@ function WeekRow({
 }: {
   weekStart: Date
   items: PlannerItem[]
+  events: CalendarEvent[]
   today: string
   onAdd: (date: string, text: string, color: string) => void
   onToggle: (item: PlannerItem) => void
@@ -339,6 +362,13 @@ function WeekRow({
     const existing = itemsByDate.get(item.date) ?? []
     existing.push(item)
     itemsByDate.set(item.date, existing)
+  }
+
+  const eventsByDate = new Map<string, CalendarEvent[]>()
+  for (const event of events) {
+    const existing = eventsByDate.get(event.date) ?? []
+    existing.push(event)
+    eventsByDate.set(event.date, existing)
   }
 
   return (
@@ -359,6 +389,7 @@ function WeekRow({
               key={dateStr}
               date={day}
               items={itemsByDate.get(dateStr) ?? []}
+              events={eventsByDate.get(dateStr) ?? []}
               isToday={dateStr === today}
               isPast={dateStr < today}
               onAdd={onAdd}
@@ -392,6 +423,7 @@ function PlannerSkeleton() {
 
 export default function PlannerView() {
   const [items, setItems] = useState<PlannerItem[]>([])
+  const [calEvents, setCalEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [weekOffset, setWeekOffset] = useState(0)
@@ -410,9 +442,13 @@ export default function PlannerView() {
     setLoading(true)
     setError(false)
     try {
-      const res = await fetch(`/api/planner?from=${rangeFrom}&to=${rangeTo}`)
-      if (!res.ok) { setError(true); return }
-      setItems(await res.json())
+      const [plannerRes, eventsRes] = await Promise.all([
+        fetch(`/api/planner?from=${rangeFrom}&to=${rangeTo}`),
+        fetch(`/api/calendar-events?from=${rangeFrom}&to=${rangeTo}`),
+      ])
+      if (!plannerRes.ok) { setError(true); return }
+      setItems(await plannerRes.json())
+      if (eventsRes.ok) setCalEvents(await eventsRes.json())
     } catch {
       setError(true)
     } finally {
@@ -470,14 +506,11 @@ export default function PlannerView() {
     } catch { /* ignore */ }
   }
 
-  const week1Items = items.filter((i) => {
-    const w2Start = toDateStr(week2Start)
-    return i.date < w2Start
-  })
-  const week2Items = items.filter((i) => {
-    const w2Start = toDateStr(week2Start)
-    return i.date >= w2Start
-  })
+  const w2StartStr = toDateStr(week2Start)
+  const week1Items = items.filter((i) => i.date < w2StartStr)
+  const week2Items = items.filter((i) => i.date >= w2StartStr)
+  const week1Events = calEvents.filter((e) => e.date < w2StartStr)
+  const week2Events = calEvents.filter((e) => e.date >= w2StartStr)
 
   const totalIncomplete = items.filter((i) => !i.isCompleted).length
 
@@ -546,6 +579,7 @@ export default function PlannerView() {
             <WeekRow
               weekStart={week1Start}
               items={week1Items}
+              events={week1Events}
               today={today}
               onAdd={handleAdd}
               onToggle={handleToggle}
@@ -556,6 +590,7 @@ export default function PlannerView() {
             <WeekRow
               weekStart={week2Start}
               items={week2Items}
+              events={week2Events}
               today={today}
               onAdd={handleAdd}
               onToggle={handleToggle}

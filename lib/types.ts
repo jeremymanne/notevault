@@ -45,3 +45,24 @@ export interface PlannerItem {
   createdAt: string
   updatedAt: string
 }
+
+export interface CalendarFeed {
+  id: string
+  name: string
+  url: string
+  color: string
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CalendarEvent {
+  id: string
+  title: string
+  date: string
+  startTime?: string
+  endTime?: string
+  allDay: boolean
+  feedName: string
+  feedColor: string
+}
