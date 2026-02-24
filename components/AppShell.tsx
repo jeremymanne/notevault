@@ -6,6 +6,7 @@ import Sidebar from './Sidebar'
 import NoteList from './NoteList'
 import Editor from './Editor'
 import TaskView from './TaskView'
+import PlannerView from './PlannerView'
 
 type MobilePanel = 'sidebar' | 'list' | 'editor'
 
@@ -42,6 +43,8 @@ export default function AppShell() {
   }
 
   const isTasksView = view === 'tasks'
+  const isPlannerView = view === 'planner'
+  const isFullWidthView = isTasksView || isPlannerView
   const divider = 'border-gray-200 dark:border-gray-700'
 
   return (
@@ -61,7 +64,7 @@ export default function AppShell() {
       </div>
 
       {/* Note List — 320px */}
-      {!isTasksView && (
+      {!isFullWidthView && (
         <div className={`w-80 flex-shrink-0 ${mobilePanel === 'list' ? 'flex' : 'hidden'} md:flex border-l ${divider}`}>
           <NoteList
             view={view}
@@ -80,7 +83,7 @@ export default function AppShell() {
       )}
 
       {/* Editor — flex-1 */}
-      {!isTasksView && (
+      {!isFullWidthView && (
         <div className={`flex-1 min-w-0 ${mobilePanel === 'editor' ? 'flex' : 'hidden'} md:flex border-l ${divider}`}>
           <Editor
             noteId={noteId}
@@ -107,6 +110,13 @@ export default function AppShell() {
       {isTasksView && (
         <div className={`flex-1 min-w-0 border-l ${divider} flex overflow-hidden`}>
           <TaskView onNavigate={navigate} />
+        </div>
+      )}
+
+      {/* Planner View */}
+      {isPlannerView && (
+        <div className={`flex-1 min-w-0 border-l ${divider} flex overflow-hidden`}>
+          <PlannerView />
         </div>
       )}
     </div>

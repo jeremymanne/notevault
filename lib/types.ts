@@ -34,3 +34,14 @@ export interface Note {
   notebook?: Notebook | null
   tags: NoteTag[]
 }
+
+export interface PlannerItem {
+  id: string
+  text: string
+  date: string
+  isCompleted: boolean
+  color: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
