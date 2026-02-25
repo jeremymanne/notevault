@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import ical from 'node-ical'
 
+const TZ = 'America/Los_Angeles'
+
 interface CalendarEvent {
   id: string
   title: string
@@ -13,27 +15,48 @@ interface CalendarEvent {
   feedColor: string
 }
 
-function toDateStr(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
+function toDateStrTz(d: Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d)
+  const y = parts.find((p) => p.type === 'year')!.value
+  const m = parts.find((p) => p.type === 'month')!.value
+  const day = parts.find((p) => p.type === 'day')!.value
   return `${y}-${m}-${day}`
 }
 
-function toTimeStr(d: Date): string {
+function toTimeStrTz(d: Date): string {
   return d.toLocaleTimeString('en-US', {
+    timeZone: TZ,
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
   })
 }
 
+function getHourInTz(d: Date): number {
+  return parseInt(
+    d.toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', hour12: false }),
+    10
+  )
+}
+
+function getMinuteInTz(d: Date): number {
+  return parseInt(
+    d.toLocaleTimeString('en-US', { timeZone: TZ, minute: '2-digit' }).replace(/\D/g, ''),
+    10
+  )
+}
+
 function isAllDay(start: Date, end: Date): boolean {
   return (
-    start.getHours() === 0 &&
-    start.getMinutes() === 0 &&
-    end.getHours() === 0 &&
-    end.getMinutes() === 0 &&
+    getHourInTz(start) === 0 &&
+    getMinuteInTz(start) === 0 &&
+    getHourInTz(end) === 0 &&
+    getMinuteInTz(end) === 0 &&
     end.getTime() - start.getTime() >= 86400000
   )
 }
@@ -64,15 +87,15 @@ function expandRecurring(
       for (const date of dates) {
         const start = new Date(date)
         const end = new Date(start.getTime() + duration)
-        const dateStr = toDateStr(start)
+        const dateStr = toDateStrTz(start)
         const allDay = duration > 0 ? isAllDay(start, end) : true
 
         events.push({
           id: `${uid}_${dateStr}`,
           title: summary,
           date: dateStr,
-          startTime: allDay ? undefined : toTimeStr(start),
-          endTime: allDay ? undefined : toTimeStr(end),
+          startTime: allDay ? undefined : toTimeStrTz(start),
+          endTime: allDay ? undefined : toTimeStrTz(end),
           allDay,
           feedName,
           feedColor,
@@ -87,17 +110,19 @@ function expandRecurring(
   if (events.length === 0 && event.start) {
     const start = new Date(event.start)
     const end = event.end ? new Date(event.end) : start
-    const dateStr = toDateStr(start)
+    const dateStr = toDateStrTz(start)
+    const rangeFromStr = toDateStrTz(rangeStart)
+    const rangeToStr = toDateStrTz(rangeEnd)
 
-    if (dateStr >= toDateStr(rangeStart) && dateStr <= toDateStr(rangeEnd)) {
+    if (dateStr >= rangeFromStr && dateStr <= rangeToStr) {
       const allDay = isAllDay(start, end)
 
       // Multi-day events: create an entry for each day
       if (allDay && end.getTime() - start.getTime() > 86400000) {
         const current = new Date(start)
         while (current < end) {
-          const ds = toDateStr(current)
-          if (ds >= toDateStr(rangeStart) && ds <= toDateStr(rangeEnd)) {
+          const ds = toDateStrTz(current)
+          if (ds >= rangeFromStr && ds <= rangeToStr) {
             events.push({
               id: `${uid}_${ds}`,
               title: summary,
@@ -114,8 +139,8 @@ function expandRecurring(
           id: `${uid}_${dateStr}`,
           title: summary,
           date: dateStr,
-          startTime: allDay ? undefined : toTimeStr(start),
-          endTime: allDay ? undefined : toTimeStr(end),
+          startTime: allDay ? undefined : toTimeStrTz(start),
+          endTime: allDay ? undefined : toTimeStrTz(end),
           allDay,
           feedName,
           feedColor,
